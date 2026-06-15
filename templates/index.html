@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件工坊 - 多功能文件处理工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body { background: #0f172a; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .tool-card { background: linear-gradient(135deg, #1e293b, #1a2332); border: 1px solid #334155; border-radius: 12px; transition: all 0.2s; }
+        .tool-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.15); }
+        .btn-primary { background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; border: none; border-radius: 8px; padding: 8px 20px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99,102,241,0.4); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .input-field { background: #334155; border: 1px solid #475569; border-radius: 8px; padding: 8px 12px; color: #e2e8f0; width: 100%; outline: none; transition: border-color 0.2s; }
+        .input-field:focus { border-color: #6366f1; }
+        .input-field::placeholder { color: #64748b; }
+        .file-zone { border: 2px dashed #475569; border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .file-zone:hover, .file-zone.drag-over { border-color: #6366f1; background: rgba(99,102,241,0.08); }
+        .result-item { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+        .tab-active { border-bottom: 2px solid #6366f1; color: #6366f1; }
+        .tab-inactive { color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; }
+        .tab-inactive:hover { color: #e2e8f0; }
+        .toast { position: fixed; bottom: 24px; right: 24px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); z-index: 1000; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .spinner { border: 2px solid #334155; border-top: 2px solid #6366f1; border-radius: 50%; width: 16px; height: 16px; animation: spin 0.8s linear infinite; display: inline-block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        select.input-field { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+        input[type="color"] { height: 40px; padding: 2px; cursor: pointer; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<div class="max-w-5xl mx-auto px-4 py-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="text-2xl font-bold flex items-center gap-3">
+                <i class="fas fa-tools text-indigo-400"></i>
+                文件工坊
+            </h1>
+            <p class="text-slate-400 text-sm mt-1">本地运行 · 无需上传云端 · 安全可靠</p>
+        </div>
+        <div class="text-right text-xs text-slate-500">
+            <div>v1.0 · 文件工坊</div>
+        </div>
+    </div>
+
+    <!-- Tool Navigation -->
+    <div class="flex gap-6 border-b border-slate-700 mb-6 overflow-x-auto">
+        <button class="tab-active pb-2 font-medium text-sm whitespace-nowrap" data-tab="image">图片处理</button>
+        <button class="tab-inactive pb-2 font-medium text-sm whitespace-nowrap" data-tab="pdf">PDF工具</button>
+        <button class="tab-inactive pb-2 font-medium text-sm whitespace-nowrap" data-tab="qrcode">二维码</button>
+        <button class="tab-inactive pb-2 font-medium text-sm whitespace-nowrap" data-tab="text">文本处理</button>
+        <button class="tab-inactive pb-2 font-medium text-sm whitespace-nowrap" data-tab="convert">格式转换</button>
+    </div>
+
+    <!-- ===== 图片处理 ===== -->
+    <div id="tab-image" class="tab-content">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="tool-card p-5">
+                <h3 class="font-semibold text-base mb-1"><i class="fas fa-compress-alt text-indigo-400 mr-2"></i>图片压缩</h3>
+                <p class="text-xs text-slate-400 mb-4">批量压缩JPG/PNG/WebP图片，减小文件体积</p>
+                <div class="file-zone mb-3" id="compress-zone">
+                    <i class="fas fa-cloud-upload-alt text-2xl text-slate-500 mb-2"></i>
+                    <p class="text-sm text-slate-400">点击或拖拽上传图片</p>
+                </div>
+                <input type="file" id="compress-input" multiple accept="image/*" class="hidden">
+                <div class="flex gap-2 items-center mb-3">
+                    <span class="text-xs text-slate-400">质量:</span>
+                    <input type="range" id="compress-quality" min="10" max="100" value="70" class="flex-1 accent-indigo-500">
+                    <span class="text-xs text-indigo-300 w-8 text-right" id="compress-quality-val">70%</span>
+                </div>
+                <button class="btn-primary w-full text-sm" id="compress-btn"><i class="fas fa-play mr-1"></i>开始压缩</button>
+                <div id="compress-result" class="mt-3 hidden"></div>
+            </div>
+
+            <div class="tool-card p-5">
+                <h3 class="font-semibold text-base mb-1"><i class="fas fa-exchange-alt text-indigo-400 mr-2"></i>格式转换</h3>
+                <p class="text-xs text-slate-400 mb-4">在PNG/JPG/WebP/BMP/GIF/ICO之间互转</p>
+                <div class="file-zone mb-3" id="convert-zone">
+                    <i class="fas fa-cloud-upload-alt text-2xl text-slate-500 mb-2"></i>
+                    <p class="text-sm text-slate-400">点击或拖拽上传图片</p>
+                </div>
+                <input type="file" id="convert-input" multiple accept="image/*" class="hidden">
+                <div class="mb-3">
+                    <label class="text-xs text-slate-400 block mb-1">输出格式:</label>
+                    <select class="input-field text-sm" id="convert-format">
+                        <option value="png">PNG</option>
+                        <option value="jpg">JPG</option>
+                        <option value="webp">WebP</option>
+                        <option value="bmp">BMP</option>
+                        <option value="gif">GIF</option>
+                        <option value="ico">ICO</option>
+                    </select>
+                </div>
+                <button class="btn-primary w-full text-sm" id="convert-btn"><i class="fas fa-play mr-1"></i>开始转换</button>
+                <div id="convert-result" class="mt-3 hidden"></div>
+            </div>
+
+            <div class="tool-card p-5">
+                <h3 class="font-semibold text-base mb-1"><i class="fas fa-expand-arrows-alt text-indigo-400 mr-2"></i>图片缩放</h3>
+                <p class="text-xs text-slate-400 mb-4">批量调整图片尺寸，支持按比例缩放</p>
+                <div class="file-zone mb-3" id="resize-zone">
+                    <i class="fas fa-cloud-upload-alt text-2xl text-slate-500 mb-2"></i>
+                    <p class="text-sm text-slate-400">点击或拖拽上传图片</p>
+                </div>
+                <input type="file" id="resize-input" multiple accept="image/*" class="hidden">
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">宽度(px):</label>
+                        <input type="number" class="input-field text-sm" id="resize-width" value="1920" min="1">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">高度(px):</label>
+                        <input type="number" class="input-field text-sm" id="resize-height" value="0" min="0" placeholder="0=自动">
+                    </div>
+                </div>
+                <label class="flex items-center gap-2 text-xs text-slate-400 mb-3">
+                    <input type="checkbox" id="resize-ratio" checked class="accent-indigo-500"> 保持宽高比
+                </label>
+                <button class="btn-primary w-full text-sm" id="resize-btn"><i class="fas fa-play mr-1"></i>开始缩放</button>
+                <div id="resize-result" class="mt-3 hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== PDF工具 ===== -->
+    <div id="tab-pdf" class="tab-content hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="tool-card p-5">
+                <h3 class="font-semibold text-base mb-1"><i class="fas fa-object-group text-indigo-400 mr-2"></i>PDF合并</h3>
+                <p class="text-xs text-slate-400 mb-4">将多个PDF文件合并为一个</p>
+                <div class="file-zone mb-3" id="pdf-merge-zone">
+                    <i class="fas fa-cloud-upload-alt text-2xl text-slate-500 mb-2"></i>
+                    <p class="text-sm text-slate-400">点击或拖拽上传PDF文件</p>
+                </div>
+                <input type="file" id="pdf-merge-input" multiple accept=".pdf" class="hidden">
+                <button class="btn-primary w-full text-sm" id="pdf-merge-btn"><i class="fas fa-play mr-1"></i>开始合并</button>
+                <div id="pdf-merge-result" class="mt-3 hidden"></div>
+            </div>
+
+            <div class="tool-card p-5">
+                <h3 class="font-semibold text-base mb-1"><i class="fas fa-cut text-indigo-400 mr-2"></i>PDF拆分</h3>
+                <p class="text-xs text-slate-400 mb-4">将PDF按页拆分为多个独立文件</p>
+                <div class="file-zone mb-3" id="pdf-split-zone">
+                    <i class="fas fa-cloud-upload-alt text-2xl text-slate-500 mb-2"></i>
+                    <p class="text-sm text-slate-400">点击或拖拽上传一个PDF文件</p>
+                </div>
+                <input type="file" id="pdf-split-input" accept=".pdf" class="hidden">
+                <button class="btn-primary w-full text-sm" id="pdf-split-btn"><i class="fas fa-play mr-1"></i>开始拆分</button>
+                <div id="pdf-split-result" class="mt-3 hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 二维码 ===== -->
+    <div id="tab-qrcode" class="tab-content hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="tool-card p-5">
+                <h3 class="font-semibold text-base mb-1"><i class="fas fa-qrcode text-indigo-400 mr-2"></i>生成二维码</h3>
+                <p class="text-xs text-slate-400 mb-4">将文本/链接/联系方式编码为二维码图片</p>
+                <div class="mb-3">
+                    <label class="text-xs text-slate-400 block mb-1">内容:</label>
+                    <textarea class="input-field text-sm" id="qr-data" rows="3" placeholder="输入文本或链接..."></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">尺寸:</label>
+                        <input type="number" class="input-field text-sm" id="qr-size" value="10" min="4" max="40">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">前景色:</label>
+                        <input type="color" class="input-field" id="qr-fg" value="#000000">
+                    </div>
+                </div>
+                <button class="btn-primary w-full text-sm" id="qr-btn"><i class="fas fa-play mr-1"></i>生成二维码</button>
+                <div id="qr-result" class="mt-3 hidden"></div>
+            </div>
+
+            <div class="tool-card p-5">
+                <h3 class="font-semibold text-base mb-1"><i class="fas fa-layer-group text-indigo-400 mr-2"></i>批量生成</h3>
+                <p class="text-xs text-slate-400 mb-4">从文本文件批量生成二维码（每行一个）</p>
+                <div class="file-zone mb-3" id="qr-batch-zone">
+                    <i class="fas fa-cloud-upload-alt text-2xl text-slate-500 mb-2"></i>
+                    <p class="text-sm text-slate-400">上传TXT文件（每行一条内容）</p>
+                </div>
+                <input type="file" id="qr-batch-input" accept=".txt" class="hidden">
+                <button class="btn-primary w-full text-sm" id="qr-batch-btn"><i class="fas fa-play mr-1"></i>批量生成</button>
+                <div id="qr-batch-result" class="mt-3 hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 文本处理 ===== -->
+    <div id="tab-text" class="tab-content hidden">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="tool-card p-5">
+                <h3 class="font-semibold text-base mb-1"><i class="fas fa-eraser text-indigo-400 mr-2"></i>去重</h3>
+                <p class="text-xs text-slate-400 mb-4">去除文本文件中的重复行，保留首次出现顺序</p>
+                <div class="file-zone mb-3" id="dedup-zone">
+                    <i class="fas fa-cloud-upload-alt text-2xl text-slate-500 mb-2"></i>
+                    <p class="text-sm text-slate-400">上传TXT文件</p>
+                </div>
+                <input type="file" id="dedup-input" accept=".txt" class="hidden">
+                <button class="btn-primary w-full text-sm" id="dedup-btn"><i class="fas fa-play mr-1"></i>开始去重</button>
+                <div id="dedup-result" class="mt-3 hidden"></div>
+            </div>
+
+            <div class="tool-card p-5">
+                <h3 class="font-semibold text-base mb-1"><i class="fas fa-sort-amount-down text-indigo-400 mr-2"></i>排序</h3>
+                <p class="text-xs text-slate-400 mb-4">对文本行按字母顺序排序（升序/降序）</p>
+                <div class="file-zone mb-3" id="sort-zone">
+                    <i class="fas fa-cloud-upload-alt text-2xl text-slate-500 mb-2"></i>
+                    <p class="text-sm text-slate-400">上传TXT文件</p>
+                </div>
+                <input type="file" id="sort-input" accept=".txt" class="hidden">
+                <div class="flex gap-2 mb-3">
+                    <select class="input-field text-sm" id="sort-order">
+                        <option value="asc">升序 (A→Z)</option>
+                        <option value="desc">降序 (Z→A)</option>
+                    </select>
+                </div>
+                <label class="flex items-center gap-2 text-xs text-slate-400 mb-3">
+                    <input type="checkbox" id="sort-ignore-case" checked class="accent-indigo-500"> 忽略大小写
+                </label>
+                <button class="btn-primary w-full text-sm" id="sort-btn"><i class="fas fa-play mr-1"></i>开始排序</button>
+                <div id="sort-result" class="mt-3 hidden"></div>
+            </div>
+
+            <div class="tool-card p-5">
+                <h3 class="font-semibold text-base mb-1"><i class="fas fa-search text-indigo-400 mr-2"></i>查找替换</h3>
+                <p class="text-xs text-slate-400 mb-4">批量查找替换文本内容，支持正则</p>
+                <div class="file-zone mb-3" id="replace-zone">
+                    <i class="fas fa-cloud-upload-alt text-2xl text-slate-500 mb-2"></i>
+                    <p class="text-sm text-slate-400">上传TXT文件</p>
+                </div>
+                <input type="file" id="replace-input" accept=".txt" class="hidden">
+                <div class="mb-2">
+                    <input type="text" class="input-field text-sm mb-2" id="replace-find" placeholder="查找内容">
+                    <input type="text" class="input-field text-sm" id="replace-with" placeholder="替换为">
+                </div>
+                <label class="flex items-center gap-2 text-xs text-slate-400 mb-3">
+                    <input type="checkbox" id="replace-regex" class="accent-indigo-500"> 使用正则表达式
+                </label>
+                <button class="btn-primary w-full text-sm" id="replace-btn"><i class="fas fa-play mr-1"></i>开始替换</button>
+                <div id="replace-result" class="mt-3 hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 格式转换 ===== -->
+    <div id="tab-convert" class="tab-content hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="tool-card p-5">
+                <h3 class="font-semibold text-base mb-1"><i class="fas fa-file-excel text-indigo-400 mr-2"></i>CSV → Excel</h3>
+                <p class="text-xs text-slate-400 mb-4">将CSV文件转换为Excel xlsx格式</p>
+                <div class="file-zone mb-3" id="csv2excel-zone">
+                    <i class="fas fa-cloud-upload-alt text-2xl text-slate-500 mb-2"></i>
+                    <p class="text-sm text-slate-400">上传CSV文件</p>
+                </div>
+                <input type="file" id="csv2excel-input" accept=".csv" class="hidden">
+                <button class="btn-primary w-full text-sm" id="csv2excel-btn"><i class="fas fa-play mr-1"></i>开始转换</button>
+                <div id="csv2excel-result" class="mt-3 hidden"></div>
+            </div>
+
+            <div class="tool-card p-5">
+                <h3 class="font-semibold text-base mb-1"><i class="fas fa-file-csv text-indigo-400 mr-2"></i>Excel → CSV</h3>
+                <p class="text-xs text-slate-400 mb-4">将Excel文件转换为CSV格式</p>
+                <div class="file-zone mb-3" id="excel2csv-zone">
+                    <i class="fas fa-cloud-upload-alt text-2xl text-slate-500 mb-2"></i>
+                    <p class="text-sm text-slate-400">上传xlsx/xls文件</p>
+                </div>
+                <input type="file" id="excel2csv-input" accept=".xlsx,.xls" class="hidden">
+                <button class="btn-primary w-full text-sm" id="excel2csv-btn"><i class="fas fa-play mr-1"></i>开始转换</button>
+                <div id="excel2csv-result" class="mt-3 hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast hidden"></div>
+</div>
+
+<script>
+const API_BASE = '';
+
+function showToast(msg, type='info') {
+    const t = document.getElementById('toast');
+    t.innerHTML = `<i class="fas ${type==='error' ? 'fa-exclamation-circle text-red-400' : 'fa-check-circle text-green-400'} mr-2"></i>${msg}`;
+    t.classList.remove('hidden');
+    setTimeout(() => t.classList.add('hidden'), 3500);
+}
+
+function showResult(containerId, data, downloadKey, extraHtml='') {
+    const el = document.getElementById(containerId);
+    el.classList.remove('hidden');
+    if (data.error) {
+        el.innerHTML = `<div class="result-item text-red-400 text-sm">${data.error}</div>`;
+        return;
+    }
+    el.innerHTML = `
+        <div class="result-item">
+            <div class="flex items-center justify-between mb-1">
+                <span class="text-green-400 text-sm font-medium"><i class="fas fa-check-circle mr-1"></i>处理完成</span>
+                <a href="/download/${data[downloadKey]}" class="text-indigo-400 text-sm hover:text-indigo-300"><i class="fas fa-download mr-1"></i>下载</a>
+            </div>
+            ${extraHtml}
+        </div>
+    `;
+}
+
+// Tab switching
+document.querySelectorAll('[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-tab]').forEach(b => b.className = 'tab-inactive pb-2 font-medium text-sm whitespace-nowrap');
+        btn.className = 'tab-active pb-2 font-medium text-sm whitespace-nowrap';
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+        document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
+    });
+});
+
+// File zone setup
+function setupFileZone(zoneId, inputId) {
+    const zone = document.getElementById(zoneId);
+    const input = document.getElementById(inputId);
+    zone.addEventListener('click', () => input.click());
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        if (e.dataTransfer.files.length) input.files = e.dataTransfer.files;
+    });
+    input.addEventListener('change', () => {
+        const n = input.files.length;
+        zone.innerHTML = n ? `<i class="fas fa-check-circle text-green-400 text-xl mb-1"></i><p class="text-sm text-green-400">已选择 ${n} 个文件</p>` : `<i class="fas fa-cloud-upload-alt text-2xl text-slate-500 mb-2"></i><p class="text-sm text-slate-400">点击或拖拽上传文件</p>`;
+    });
+}
+
+setupFileZone('compress-zone', 'compress-input');
+setupFileZone('convert-zone', 'convert-input');
+setupFileZone('resize-zone', 'resize-input');
+setupFileZone('pdf-merge-zone', 'pdf-merge-input');
+setupFileZone('pdf-split-zone', 'pdf-split-input');
+setupFileZone('qr-batch-zone', 'qr-batch-input');
+setupFileZone('dedup-zone', 'dedup-input');
+setupFileZone('sort-zone', 'sort-input');
+setupFileZone('replace-zone', 'replace-input');
+setupFileZone('csv2excel-zone', 'csv2excel-input');
+setupFileZone('excel2csv-zone', 'excel2csv-input');
+
+// Quality slider
+document.getElementById('compress-quality').addEventListener('input', function() {
+    document.getElementById('compress-quality-val').textContent = this.value + '%';
+});
+
+// Upload helper
+function uploadFiles(url, formData, btnId, resultId, callback) {
+    const btn = document.getElementById(btnId);
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner mr-1"></span>处理中...';
+    fetch(url, { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            callback(data, resultId);
+        })
+        .catch(err => {
+            showToast('处理出错: ' + err.message, 'error');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-play mr-1"></i>' + btn.dataset.label || '开始';
+        });
+}
+
+function restoreBtn(btnId, label) {
+    const btn = document.getElementById(btnId);
+    btn.disabled = false;
+    btn.innerHTML = `<i class="fas fa-play mr-1"></i>${label}`;
+}
+
+// === Image Compress ===
+document.getElementById('compress-btn').addEventListener('click', function() {
+    const files = document.getElementById('compress-input').files;
+    if (!files.length) return showToast('请先选择图片文件', 'error');
+    const fd = new FormData();
+    for (let f of files) fd.append('files', f);
+    fd.append('quality', document.getElementById('compress-quality').value);
+    this.disabled = true; this.innerHTML = '<span class="spinner mr-1"></span>压缩中...';
+    this.dataset.label = '开始压缩';
+    fetch('/api/image/compress', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            const el = document.getElementById('compress-result'); el.classList.remove('hidden');
+            if (d.error) { el.innerHTML = `<div class="result-item text-red-400 text-sm">${d.error}</div>`; return; }
+            let html = d.results.map(r => `<div class="text-xs text-slate-300">${r.original}: ${r.saved} (${(r.new_size/1024).toFixed(1)}KB)</div>`).join('');
+            el.innerHTML = `<div class="result-item"><div class="flex items-center justify-between mb-1"><span class="text-green-400 text-sm font-medium"><i class="fas fa-check-circle mr-1"></i>压缩完成</span><a href="/download/${d.download}" class="text-indigo-400 text-sm hover:text-indigo-300"><i class="fas fa-download mr-1"></i>下载ZIP</a></div>${html}</div>`;
+        })
+        .catch(e => showToast('出错: ' + e.message, 'error'))
+        .finally(() => { this.disabled = false; this.innerHTML = '<i class="fas fa-play mr-1"></i>开始压缩'; });
+});
+
+// === Image Convert ===
+document.getElementById('convert-btn').addEventListener('click', function() {
+    const files = document.getElementById('convert-input').files;
+    if (!files.length) return showToast('请先选择图片文件', 'error');
+    const fd = new FormData();
+    for (let f of files) fd.append('files', f);
+    fd.append('format', document.getElementById('convert-format').value);
+    this.disabled = true; this.innerHTML = '<span class="spinner mr-1"></span>转换中...';
+    this.dataset.label = '开始转换';
+    fetch('/api/image/convert', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            const el = document.getElementById('convert-result'); el.classList.remove('hidden');
+            if (d.error) { el.innerHTML = `<div class="result-item text-red-400 text-sm">${d.error}</div>`; return; }
+            let html = d.results.map(r => `<div class="text-xs text-slate-300">${r.original} → ${r.format}</div>`).join('');
+            el.innerHTML = `<div class="result-item"><div class="flex items-center justify-between mb-1"><span class="text-green-400 text-sm font-medium"><i class="fas fa-check-circle mr-1"></i>转换完成</span><a href="/download/${d.download}" class="text-indigo-400 text-sm hover:text-indigo-300"><i class="fas fa-download mr-1"></i>下载ZIP</a></div>${html}</div>`;
+        })
+        .catch(e => showToast('出错: ' + e.message, 'error'))
+        .finally(() => { this.disabled = false; this.innerHTML = '<i class="fas fa-play mr-1"></i>开始转换'; });
+});
+
+// === Image Resize ===
+document.getElementById('resize-btn').addEventListener('click', function() {
+    const files = document.getElementById('resize-input').files;
+    if (!files.length) return showToast('请先选择图片文件', 'error');
+    const fd = new FormData();
+    for (let f of files) fd.append('files', f);
+    fd.append('width', document.getElementById('resize-width').value);
+    fd.append('height', document.getElementById('resize-height').value);
+    fd.append('keep_ratio', document.getElementById('resize-ratio').checked ? 'true' : 'false');
+    this.disabled = true; this.innerHTML = '<span class="spinner mr-1"></span>缩放中...';
+    this.dataset.label = '开始缩放';
+    fetch('/api/image/resize', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            const el = document.getElementById('resize-result'); el.classList.remove('hidden');
+            if (d.error) { el.innerHTML = `<div class="result-item text-red-400 text-sm">${d.error}</div>`; return; }
+            let html = d.results.map(r => `<div class="text-xs text-slate-300">${r.original}: ${r.size}</div>`).join('');
+            el.innerHTML = `<div class="result-item"><div class="flex items-center justify-between mb-1"><span class="text-green-400 text-sm font-medium"><i class="fas fa-check-circle mr-1"></i>缩放完成</span><a href="/download/${d.download}" class="text-indigo-400 text-sm hover:text-indigo-300"><i class="fas fa-download mr-1"></i>下载ZIP</a></div>${html}</div>`;
+        })
+        .catch(e => showToast('出错: ' + e.message, 'error'))
+        .finally(() => { this.disabled = false; this.innerHTML = '<i class="fas fa-play mr-1"></i>开始缩放'; });
+});
+
+// === PDF Merge ===
+document.getElementById('pdf-merge-btn').addEventListener('click', function() {
+    const files = document.getElementById('pdf-merge-input').files;
+    if (!files.length) return showToast('请先选择PDF文件', 'error');
+    const fd = new FormData();
+    for (let f of files) fd.append('files', f);
+    this.disabled = true; this.innerHTML = '<span class="spinner mr-1"></span>合并中...';
+    this.dataset.label = '开始合并';
+    fetch('/api/pdf/merge', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            const el = document.getElementById('pdf-merge-result'); el.classList.remove('hidden');
+            if (d.error) { el.innerHTML = `<div class="result-item text-red-400 text-sm">${d.error}</div>`; return; }
+            let html = d.results.map(r => `<div class="text-xs text-slate-300">${r.original}</div>`).join('');
+            el.innerHTML = `<div class="result-item"><div class="flex items-center justify-between mb-1"><span class="text-green-400 text-sm font-medium"><i class="fas fa-check-circle mr-1"></i>合并完成</span><a href="/download/${d.download}" class="text-indigo-400 text-sm hover:text-indigo-300"><i class="fas fa-download mr-1"></i>下载PDF</a></div>${html}</div>`;
+        })
+        .catch(e => showToast('出错: ' + e.message, 'error'))
+        .finally(() => { this.disabled = false; this.innerHTML = '<i class="fas fa-play mr-1"></i>开始合并'; });
+});
+
+// === PDF Split ===
+document.getElementById('pdf-split-btn').addEventListener('click', function() {
+    const file = document.getElementById('pdf-split-input').files[0];
+    if (!file) return showToast('请先选择一个PDF文件', 'error');
+    const fd = new FormData();
+    fd.append('file', file);
+    this.disabled = true; this.innerHTML = '<span class="spinner mr-1"></span>拆分中...';
+    this.dataset.label = '开始拆分';
+    fetch('/api/pdf/split', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            const el = document.getElementById('pdf-split-result'); el.classList.remove('hidden');
+            if (d.error) { el.innerHTML = `<div class="result-item text-red-400 text-sm">${d.error}</div>`; return; }
+            el.innerHTML = `<div class="result-item"><div class="flex items-center justify-between mb-1"><span class="text-green-400 text-sm font-medium"><i class="fas fa-check-circle mr-1"></i>拆分完成</span><a href="/download/${d.download}" class="text-indigo-400 text-sm hover:text-indigo-300"><i class="fas fa-download mr-1"></i>下载ZIP</a></div><div class="text-xs text-slate-300">共拆分为 ${d.total_pages} 个文件</div></div>`;
+        })
+        .catch(e => showToast('出错: ' + e.message, 'error'))
+        .finally(() => { this.disabled = false; this.innerHTML = '<i class="fas fa-play mr-1"></i>开始拆分'; });
+});
+
+// === QR Generate ===
+document.getElementById('qr-btn').addEventListener('click', function() {
+    const data = document.getElementById('qr-data').value.trim();
+    if (!data) return showToast('请输入要编码的内容', 'error');
+    const fd = new FormData();
+    fd.append('data', data);
+    fd.append('size', document.getElementById('qr-size').value);
+    fd.append('fg_color', document.getElementById('qr-fg').value);
+    this.disabled = true; this.innerHTML = '<span class="spinner mr-1"></span>生成中...';
+    this.dataset.label = '生成二维码';
+    fetch('/api/qrcode/generate', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            const el = document.getElementById('qr-result'); el.classList.remove('hidden');
+            if (d.error) { el.innerHTML = `<div class="result-item text-red-400 text-sm">${d.error}</div>`; return; }
+            el.innerHTML = `<div class="result-item"><div class="flex items-center justify-between mb-1"><span class="text-green-400 text-sm font-medium"><i class="fas fa-check-circle mr-1"></i>生成成功</span><a href="/download/${d.download}" class="text-indigo-400 text-sm hover:text-indigo-300"><i class="fas fa-download mr-1"></i>下载</a></div><div class="text-xs text-slate-400 mt-1 break-all">内容: ${d.content.substring(0, 100)}</div></div>`;
+        })
+        .catch(e => showToast('出错: ' + e.message, 'error'))
+        .finally(() => { this.disabled = false; this.innerHTML = '<i class="fas fa-play mr-1"></i>生成二维码'; });
+});
+
+// === QR Batch ===
+document.getElementById('qr-batch-btn').addEventListener('click', function() {
+    const file = document.getElementById('qr-batch-input').files[0];
+    if (!file) return showToast('请上传包含内容的TXT文件', 'error');
+    const fd = new FormData();
+    fd.append('file', file);
+    this.disabled = true; this.innerHTML = '<span class="spinner mr-1"></span>批量生成中...';
+    this.dataset.label = '批量生成';
+    fetch('/api/qrcode/batch', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            const el = document.getElementById('qr-batch-result'); el.classList.remove('hidden');
+            if (d.error) { el.innerHTML = `<div class="result-item text-red-400 text-sm">${d.error}</div>`; return; }
+            el.innerHTML = `<div class="result-item"><div class="flex items-center justify-between mb-1"><span class="text-green-400 text-sm font-medium"><i class="fas fa-check-circle mr-1"></i>批量生成完成</span><a href="/download/${d.download}" class="text-indigo-400 text-sm hover:text-indigo-300"><i class="fas fa-download mr-1"></i>下载ZIP</a></div><div class="text-xs text-slate-300">生成 ${d.total} 个二维码</div></div>`;
+        })
+        .catch(e => showToast('出错: ' + e.message, 'error'))
+        .finally(() => { this.disabled = false; this.innerHTML = '<i class="fas fa-play mr-1"></i>批量生成'; });
+});
+
+// === Text Dedup ===
+document.getElementById('dedup-btn').addEventListener('click', function() {
+    const file = document.getElementById('dedup-input').files[0];
+    if (!file) return showToast('请上传TXT文件', 'error');
+    const fd = new FormData(); fd.append('file', file);
+    this.disabled = true; this.innerHTML = '<span class="spinner mr-1"></span>处理中...';
+    this.dataset.label = '开始去重';
+    fetch('/api/text/dedup', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            const el = document.getElementById('dedup-result'); el.classList.remove('hidden');
+            if (d.error) { el.innerHTML = `<div class="result-item text-red-400 text-sm">${d.error}</div>`; return; }
+            el.innerHTML = `<div class="result-item"><div class="flex items-center justify-between mb-1"><span class="text-green-400 text-sm font-medium"><i class="fas fa-check-circle mr-1"></i>去重完成</span><a href="/download/${d.download}" class="text-indigo-400 text-sm hover:text-indigo-300"><i class="fas fa-download mr-1"></i>下载</a></div><div class="text-xs text-slate-300">${d.original_lines} 行 → ${d.unique_lines} 行 (去重 ${d.original_lines - d.unique_lines} 行)</div></div>`;
+        })
+        .catch(e => showToast('出错: ' + e.message, 'error'))
+        .finally(() => { this.disabled = false; this.innerHTML = '<i class="fas fa-play mr-1"></i>开始去重'; });
+});
+
+// === Text Sort ===
+document.getElementById('sort-btn').addEventListener('click', function() {
+    const file = document.getElementById('sort-input').files[0];
+    if (!file) return showToast('请上传TXT文件', 'error');
+    const fd = new FormData(); fd.append('file', file);
+    fd.append('order', document.getElementById('sort-order').value);
+    fd.append('ignore_case', document.getElementById('sort-ignore-case').checked ? 'true' : 'false');
+    this.disabled = true; this.innerHTML = '<span class="spinner mr-1"></span>处理中...';
+    this.dataset.label = '开始排序';
+    fetch('/api/text/sort', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            const el = document.getElementById('sort-result'); el.classList.remove('hidden');
+            if (d.error) { el.innerHTML = `<div class="result-item text-red-400 text-sm">${d.error}</div>`; return; }
+            el.innerHTML = `<div class="result-item"><div class="flex items-center justify-between mb-1"><span class="text-green-400 text-sm font-medium"><i class="fas fa-check-circle mr-1"></i>排序完成</span><a href="/download/${d.download}" class="text-indigo-400 text-sm hover:text-indigo-300"><i class="fas fa-download mr-1"></i>下载</a></div><div class="text-xs text-slate-300">共 ${d.total_lines} 行</div></div>`;
+        })
+        .catch(e => showToast('出错: ' + e.message, 'error'))
+        .finally(() => { this.disabled = false; this.innerHTML = '<i class="fas fa-play mr-1"></i>开始排序'; });
+});
+
+// === Text Replace ===
+document.getElementById('replace-btn').addEventListener('click', function() {
+    const file = document.getElementById('replace-input').files[0];
+    if (!file) return showToast('请上传TXT文件', 'error');
+    const find = document.getElementById('replace-find').value;
+    if (!find) return showToast('请输入要查找的内容', 'error');
+    const fd = new FormData(); fd.append('file', file);
+    fd.append('find', find);
+    fd.append('replace', document.getElementById('replace-with').value);
+    fd.append('use_regex', document.getElementById('replace-regex').checked ? 'true' : 'false');
+    this.disabled = true; this.innerHTML = '<span class="spinner mr-1"></span>处理中...';
+    this.dataset.label = '开始替换';
+    fetch('/api/text/replace', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            const el = document.getElementById('replace-result'); el.classList.remove('hidden');
+            if (d.error) { el.innerHTML = `<div class="result-item text-red-400 text-sm">${d.error}</div>`; return; }
+            el.innerHTML = `<div class="result-item"><div class="flex items-center justify-between mb-1"><span class="text-green-400 text-sm font-medium"><i class="fas fa-check-circle mr-1"></i>替换完成</span><a href="/download/${d.download}" class="text-indigo-400 text-sm hover:text-indigo-300"><i class="fas fa-download mr-1"></i>下载</a></div><div class="text-xs text-slate-300">共替换 ${d.replacements} 处</div></div>`;
+        })
+        .catch(e => showToast('出错: ' + e.message, 'error'))
+        .finally(() => { this.disabled = false; this.innerHTML = '<i class="fas fa-play mr-1"></i>开始替换'; });
+});
+
+// === CSV2Excel ===
+document.getElementById('csv2excel-btn').addEventListener('click', function() {
+    const file = document.getElementById('csv2excel-input').files[0];
+    if (!file) return showToast('请上传CSV文件', 'error');
+    const fd = new FormData(); fd.append('file', file);
+    this.disabled = true; this.innerHTML = '<span class="spinner mr-1"></span>转换中...';
+    this.dataset.label = '开始转换';
+    fetch('/api/convert/csv2excel', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            const el = document.getElementById('csv2excel-result'); el.classList.remove('hidden');
+            if (d.error) { el.innerHTML = `<div class="result-item text-red-400 text-sm">${d.error}</div>`; return; }
+            el.innerHTML = `<div class="result-item"><div class="flex items-center justify-between mb-1"><span class="text-green-400 text-sm font-medium"><i class="fas fa-check-circle mr-1"></i>转换完成</span><a href="/download/${d.download}" class="text-indigo-400 text-sm hover:text-indigo-300"><i class="fas fa-download mr-1"></i>下载xlsx</a></div><div class="text-xs text-slate-300">${d.rows} 行 × ${d.columns} 列</div></div>`;
+        })
+        .catch(e => showToast('出错: ' + e.message, 'error'))
+        .finally(() => { this.disabled = false; this.innerHTML = '<i class="fas fa-play mr-1"></i>开始转换'; });
+});
+
+// === Excel2CSV ===
+document.getElementById('excel2csv-btn').addEventListener('click', function() {
+    const file = document.getElementById('excel2csv-input').files[0];
+    if (!file) return showToast('请上传Excel文件', 'error');
+    const fd = new FormData(); fd.append('file', file);
+    this.disabled = true; this.innerHTML = '<span class="spinner mr-1"></span>转换中...';
+    this.dataset.label = '开始转换';
+    fetch('/api/convert/excel2csv', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            const el = document.getElementById('excel2csv-result'); el.classList.remove('hidden');
+            if (d.error) { el.innerHTML = `<div class="result-item text-red-400 text-sm">${d.error}</div>`; return; }
+            el.innerHTML = `<div class="result-item"><div class="flex items-center justify-between mb-1"><span class="text-green-400 text-sm font-medium"><i class="fas fa-check-circle mr-1"></i>转换完成</span><a href="/download/${d.download}" class="text-indigo-400 text-sm hover:text-indigo-300"><i class="fas fa-download mr-1"></i>下载CSV</a></div><div class="text-xs text-slate-300">${d.rows} 行 × ${d.columns} 列</div></div>`;
+        })
+        .catch(e => showToast('出错: ' + e.message, 'error'))
+        .finally(() => { this.disabled = false; this.innerHTML = '<i class="fas fa-play mr-1"></i>开始转换'; });
+});
+</script>
+
+</body>
+</html>
